@@ -64,8 +64,8 @@ public class Moonlight implements ModInitializer,Runnable {
         }
         ((ChunkGeneratorAccessor)chunkGenerator).getField_24749().addAll(strongholdLocs.subList(chunkGenIndex,strongholdLocs.size()-1));
         //once stronghold gen is done start generating strongholds for the next seed
-        log(Level.INFO,"Finished generating strongholds for the current seed");
         reset();
+        log(Level.INFO,"Started generating strongholds for next seed");
         thread = new Thread(this);
         thread.start();
     }
