@@ -18,7 +18,7 @@ public class ChunkGeneratorMixin {
 
     @Inject(at = @At("HEAD"),method ="method_28509", cancellable = true)
     private void genStrongholds(CallbackInfo ci){
-        if(Moonlight.shouldUse()&&this.equals(Moonlight.chunkGenerator)){
+        if(this.equals(Moonlight.preGenerator.current.getChunkGenerator())){
             ci.cancel();
         }
     }

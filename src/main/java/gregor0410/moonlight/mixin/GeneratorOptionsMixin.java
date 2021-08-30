@@ -14,16 +14,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class GeneratorOptionsMixin {
     @Inject(method="Lnet/minecraft/world/gen/GeneratorOptions;getDefaultOptions()Lnet/minecraft/world/gen/GeneratorOptions;",at=@At("HEAD"), cancellable = true)
     private static void getDefaultOptions(CallbackInfoReturnable info){
-        if(Moonlight.shouldUse()){
-            if(Moonlight.seedUsed){
-                Moonlight.reset();
-            }
-            long l = Moonlight.seed;
-            Moonlight.seedUsed=true;
+            Moonlight.preGenerator.nextSeed();
+            long l = Moonlight.preGenerator.current.seed;
             Moonlight.log(Level.INFO,String.format("Injected seed"));
             SurfaceChunkGenerator surfaceChunkGenerator = GeneratorOptions.createOverworldGenerator(l);
-            Moonlight.chunkGenerator = surfaceChunkGenerator;
+            Moonlight.preGenerator.current.setChunkGenerator(surfaceChunkGenerator);
             info.setReturnValue(new GeneratorOptions(l, true, false, GeneratorOptions.method_28608(DimensionType.method_28517(l), surfaceChunkGenerator)));
         }
     }
-}
