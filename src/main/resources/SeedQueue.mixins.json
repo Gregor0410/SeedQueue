@@ -1,12 +1,12 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "package": "gregor0410.moonlight.mixin",
+  "package": "gregor0410.seedqueue.mixin",
   "compatibilityLevel": "JAVA_8",
   "mixins": [
-    "ChunkGeneratorMixin",
-    "GeneratorOptionsMixin",
-    "ChunkGeneratorAccessor"
+    "MinecraftServerMixin",
+    "WeightedListMixin",
+    "MinecraftServerAccess"
   ],
   "client": [
   ],

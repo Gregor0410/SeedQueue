@@ -1,0 +1,3 @@
+accessWidener   v1  named
+mutable  field   net/minecraft/structure/StructureManager    structures Ljava/util/Map;
+mutable  field   net/minecraft/server/MinecraftServer    worlds Ljava/util/Map;

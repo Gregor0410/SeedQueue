@@ -1,0 +1,24 @@
+Possible solutions for chunk pre gen
+
+Subclass ServerChunkManager
+subclass ThreadedAnvilChunkStorage
+Create a new IntegratedServer Instance for every seed in the queue
+
+Use the current server instance to create a new ServerWorld ?
+
+
+Mixin to prevent writing files when pre genning
+this instanceof MoonlightIntegratedServer
+
+
+Chunk gen steps
+setStructureStarts()
+populateBiomes()
+buildSurface()
+
+MoonlightWorldCollection
+add to MinecraftServer.worlds in prepareStartRegion
+MoonlightWorldCollection manages which world to call ExecuteQueuedTasks on
+
+Always modify server.worlds in the server thread - add an among us task to do it?
+MinecraftServer.send(epic among us task)
