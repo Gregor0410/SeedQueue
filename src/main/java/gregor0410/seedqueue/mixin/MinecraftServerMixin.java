@@ -5,6 +5,8 @@ import com.google.common.collect.ImmutableList;
 import gregor0410.seedqueue.IMinecraftServer;
 import gregor0410.seedqueue.PreGenerator;
 import gregor0410.seedqueue.SeedQueue;
+import gregor0410.seedqueue.WorldInfo;
+import gregor0410.seedqueue.util.Multithreading;
 import net.minecraft.block.Block;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.WorldGenerationProgressTracker;
@@ -14,10 +16,8 @@ import net.minecraft.server.network.SpawnLocating;
 import net.minecraft.server.world.ChunkTicketType;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.tag.BlockTags;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.registry.Registry;
 import net.minecraft.util.registry.RegistryKey;
 import net.minecraft.util.registry.RegistryTracker;
 import net.minecraft.village.ZombieSiegeManager;
@@ -48,6 +48,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Mixin(MinecraftServer.class)
 public abstract class MinecraftServerMixin implements IMinecraftServer {
@@ -76,34 +77,27 @@ public abstract class MinecraftServerMixin implements IMinecraftServer {
 
     @Shadow public abstract SaveProperties getSaveProperties();
 
-    private ChunkPos spawnPos;
 
     @Inject(method="<init>",at=@At("TAIL"))
     private void onInit(CallbackInfo ci){
         this.worlds = new ConcurrentHashMap<>(this.worlds);
     }
 
-    @Inject(method = "Lnet/minecraft/server/MinecraftServer;createWorlds(Lnet/minecraft/server/WorldGenerationProgressListener;)V",at=@At("TAIL"))
-    private void onCreateWorlds(CallbackInfo ci){
-        try {
-            this.newPreGen();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     @Inject(method = "Lnet/minecraft/server/MinecraftServer;prepareStartRegion(Lnet/minecraft/server/WorldGenerationProgressListener;)V",at=@At("TAIL"))
     private void onPrepareStartRegion(CallbackInfo ci){
-        this.startPreGen();
+        SeedQueue.preGenerator.next((MinecraftServer) (Object)this);
     }
-    public void startPreGen(){
-        ServerWorld serverWorld = this.worlds.get(PreGenerator.PRE_GEN);
+    public void startPreGen(WorldInfo worldInfo){
+        ServerWorld serverWorld = worldInfo.world;
+        this.worlds.put(PreGenerator.PRE_GEN,serverWorld);
+        ChunkPos spawnPos = new ChunkPos(worldInfo.spawnPos);
         serverWorld.getChunkManager().getLightingProvider().setTaskBatchSize(500);
-//        ChunkPos spawnPos = new ChunkPos(0,0);
-        PreGenerator.worldGenerationProgressListener.start(this.spawnPos);
+        PreGenerator.worldGenerationProgressListener.start(spawnPos);
         serverWorld.getChunkManager().addTicket(ChunkTicketType.PLAYER,spawnPos,11, spawnPos);
         new Thread(()->{
-            while (serverWorld.getChunkManager().getTotalChunksLoadedCount() < 441);
+            while (serverWorld.getChunkManager().getTotalChunksLoadedCount() < 441){
+
+            }
             ((MinecraftServer)(Object)this).submit(()-> {
                 this.worlds.remove(PreGenerator.PRE_GEN);
                 try {
@@ -112,11 +106,11 @@ public abstract class MinecraftServerMixin implements IMinecraftServer {
                     e.printStackTrace();
                 }
                 PreGenerator.worldGenerationProgressListener.stop();
-                SeedQueue.preGenerator.next(serverWorld,(MinecraftServer)(Object) this);
             });
+            new Thread(()->SeedQueue.preGenerator.next((MinecraftServer)(Object) this)).start();
         }).start();
     }
-    private static BlockPos getSpawnPos(ServerWorld serverWorld) {
+    private static BlockPos getSpawnPos(ServerWorld serverWorld,MinecraftServer server) {
         BlockPos spawnPos;
         ChunkGenerator chunkGenerator = serverWorld.getChunkManager().getChunkGenerator();
         BiomeSource biomeSource = chunkGenerator.getBiomeSource();
@@ -144,9 +138,15 @@ public abstract class MinecraftServerMixin implements IMinecraftServer {
 
         for (int n = 0; n < 1024; ++n) {
             if (i > -16 && i <= 16 && j > -16 && j <= 16) {
-                BlockPos blockPos2 = SpawnLocating.findServerSpawnPoint(serverWorld, new ChunkPos(chunkPos.x + i, chunkPos.z + j), bl4);
-                if (blockPos2 != null) {
-                    spawnPos = blockPos2;
+                AtomicReference<BlockPos> blockPos2 = new AtomicReference<>();
+                int finalI = i;
+                int finalJ = j;
+                boolean finalBl = bl4;
+                Multithreading.awaitServerTask(server,()->{
+                    blockPos2.set(SpawnLocating.findServerSpawnPoint(serverWorld, new ChunkPos(chunkPos.x + finalI, chunkPos.z + finalJ), finalBl));
+                });
+                if (blockPos2.get() != null) {
+                    spawnPos = blockPos2.get();
                     break;
                 }
             }
@@ -165,16 +165,14 @@ public abstract class MinecraftServerMixin implements IMinecraftServer {
     }
 
     @Override
-    public void newPreGen() throws IOException {
+    public WorldInfo newPreGen() throws IOException {
         GeneratorOptions generatorOptions = this.saveProperties.getGeneratorOptions();
         boolean bl = generatorOptions.isDebugWorld();
         long l = (new Random()).nextLong();
         long m = BiomeAccess.hashSeed(l);
         ChunkGenerator chunkGenerator = GeneratorOptions.createOverworldGenerator(l);
-        RegistryKey<World> registryKey = RegistryKey.of(Registry.DIMENSION,new Identifier(String.format("%d", Instant.now().toEpochMilli())));
-//        SimpleRegistry<DimensionOptions> dimensionsRegistry = this.getSaveProperties().getGeneratorOptions().getDimensionMap();
-//        DimensionOptions dimensionOptions = new DimensionOptions(DimensionType::getOverworldDimensionType,chunkGenerator);
-//        dimensionsRegistry.add(RegistryKey.of(Registry.DIMENSION_OPTIONS, registryKey.getValue()), dimensionOptions);
+//        RegistryKey<World> registryKey = RegistryKey.of(Registry.DIMENSION,new Identifier(String.format("%d", Instant.now().toEpochMilli())));
+        RegistryKey<World> registryKey = World.OVERWORLD;
         List<Spawner> list = ImmutableList.of(new PhantomSpawner(), new PillagerSpawner(), new CatSpawner(), new ZombieSiegeManager(), new WanderingTraderManager(this.saveProperties.getMainWorldProperties()));
         //TODO : make new properties
         ServerWorldProperties serverWorldProperties = this.saveProperties.getMainWorldProperties();
@@ -185,9 +183,12 @@ public abstract class MinecraftServerMixin implements IMinecraftServer {
         worldGenerationProgressTracker.start();
         LevelStorage.Session session = MinecraftClient.getInstance().getLevelStorage().createSession(String.format("New World %d", Instant.now().toEpochMilli()));
         PreGenerator.worldGenerationProgressListener = worldGenerationProgressTracker;
-        ServerWorld serverWorld = new ServerWorld((MinecraftServer)(Object) this, this.workerExecutor, session, serverWorldProperties, registryKey, registryKey2, DimensionType.getOverworldDimensionType(), worldGenerationProgressTracker, chunkGenerator, bl, m, list, true);
-        this.spawnPos = new ChunkPos(getSpawnPos(serverWorld));
-        PreGenerator.PRE_GEN = registryKey;
-        this.worlds.put(PreGenerator.PRE_GEN,serverWorld);
+//        AtomicReference<BlockPos> spawnPos = new AtomicReference<>();
+        AtomicReference<ServerWorld> serverWorld = new AtomicReference<>();
+        Multithreading.awaitServerTask((MinecraftServer) (Object)this,()->{
+            serverWorld.set(new ServerWorld((MinecraftServer) (Object) this, this.workerExecutor, session, serverWorldProperties, registryKey, registryKey2, DimensionType.getOverworldDimensionType(), worldGenerationProgressTracker, chunkGenerator, bl, m, list, true));
+        });
+        BlockPos spawnPos = getSpawnPos(serverWorld.get(),(MinecraftServer) (Object)this);
+        return new WorldInfo(l,spawnPos,session,serverWorld.get());
     }
 }

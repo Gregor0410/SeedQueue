@@ -6,7 +6,8 @@
   "mixins": [
     "MinecraftServerMixin",
     "WeightedListMixin",
-    "MinecraftServerAccess"
+    "MinecraftServerAccess",
+    "MinecraftClientAccess"
   ],
   "client": [
   ],
