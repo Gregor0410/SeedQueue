@@ -16,4 +16,6 @@ public interface MinecraftServerAccess {
     }
     @Accessor("session")
     LevelStorage.Session getSession();
+    @Accessor("serverThread")
+    void setServerThread(Thread thread);
 }

@@ -6,8 +6,11 @@
   "mixins": [
     "MinecraftServerMixin",
     "WeightedListMixin",
+    "StructureManagerMixin",
     "MinecraftServerAccess",
-    "MinecraftClientAccess"
+    "MinecraftClientAccess",
+    "GeneratorOptionsMixin",
+    "CreateWorldScreenMixin"
   ],
   "client": [
   ],
